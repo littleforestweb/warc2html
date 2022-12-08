@@ -27,7 +27,7 @@ import static java.time.ZoneOffset.UTC;
 
 public class Warc2Html {
 
-    private static final DateTimeFormatter ARC_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.US).withZone(UTC);
+    private static final DateTimeFormatter ARC_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.UK).withZone(UTC);
     private static final Map<String, String> DEFAULT_FORCED_EXTENSIONS = loadForcedExtensions();
     private final Map<String, Resource> resourcesByUrlKey = new HashMap<>();
     private final Map<String, Resource> resourcesByPath = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
