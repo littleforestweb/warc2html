@@ -2,7 +2,6 @@
  * Copyright 2021 National Library of Australia
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.netpreserve.warc2html;
 
 import org.netpreserve.jwarc.WarcReader;
@@ -24,10 +23,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import java.nio.file.StandardOpenOption;
 import static java.time.ZoneOffset.UTC;
 
 public class Warc2Html {
-    private static final DateTimeFormatter ARC_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.US).withZone(UTC);
+
+    private static final DateTimeFormatter ARC_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.UK).withZone(UTC);
     private static final Map<String, String> DEFAULT_FORCED_EXTENSIONS = loadForcedExtensions();
     private final Map<String, Resource> resourcesByUrlKey = new HashMap<>();
     private final Map<String, Resource> resourcesByPath = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
@@ -60,7 +61,7 @@ public class Warc2Html {
                         return;
                 }
             } else {
-                try (InputStream stream = new FileInputStream(args[i])) {
+                try ( InputStream stream = new FileInputStream(args[i])) {
                     warc2Html.load(args[i], stream);
                 }
             }
@@ -87,10 +88,12 @@ public class Warc2Html {
     }
 
     private static Map<String, String> loadForcedExtensions() {
-        try (var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
+        try ( var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
             var map = new HashMap<String, String>();
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                if (line.isBlank()) continue;
+                if (line.isBlank()) {
+                    continue;
+                }
                 String[] fields = line.strip().split("\\s+");
                 map.put(fields[0], fields[1]);
             }
@@ -101,7 +104,9 @@ public class Warc2Html {
     }
 
     private void load(String filename, InputStream stream) throws IOException {
-        if (!stream.markSupported()) stream = new BufferedInputStream(stream);
+        if (!stream.markSupported()) {
+            stream = new BufferedInputStream(stream);
+        }
         stream.mark(1);
         int firstByte = stream.read();
         stream.reset();
@@ -114,7 +119,9 @@ public class Warc2Html {
 
     public void loadCdx(BufferedReader reader) throws IOException {
         for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-            if (line.isBlank() || line.startsWith(" ")) continue;
+            if (line.isBlank() || line.startsWith(" ")) {
+                continue;
+            }
 
             String[] fields = line.split(" ");
             Instant instant = ARC_DATE_FORMAT.parse(fields[1], Instant::from);
@@ -163,7 +170,9 @@ public class Warc2Html {
     }
 
     private void add(Resource resource) {
-        if (resource.status >= 400) return;
+        if (resource.status >= 400) {
+            return;
+        }
 
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
 
@@ -183,10 +192,8 @@ public class Warc2Html {
             keepExisting = false;
         } else if (resource.isRedirect() && !existing.isRedirect()) {
             keepExisting = true;
-        } else if (resource.instant.isBefore(existing.instant)) {
-            keepExisting = true;
         } else {
-            keepExisting = false;
+            keepExisting = resource.instant.isBefore(existing.instant);
         }
 
         if (!keepExisting) {
@@ -213,40 +220,48 @@ public class Warc2Html {
 
     public void writeTo(Path outDir) throws IOException {
         Files.createDirectories(outDir);
-        try (var filelist = Files.newBufferedWriter(outDir.resolve("filelist.txt"))) {
-            for (Resource resource : resourcesByPath.values()) {
-                try (WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
-                    WarcRecord record = reader.next().orElseThrow();
-                    if (!(record instanceof WarcResponse)) throw new IllegalStateException();
-                    WarcResponse response = (WarcResponse) record;
+        for (Resource resource : resourcesByPath.values()) {
 
-                    Path path = outDir.resolve(resource.path);
-                    Files.createDirectories(path.getParent());
-
-                    long linksRewritten = 0;
-                    try (OutputStream output = Files.newOutputStream(path)) {
-                        InputStream input = response.http().body().stream();
-                        if (resource.isRedirect()) {
-                            String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
-                            if (destination == null) destination = resource.locationHeader;
-                            output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
-                        } else if (resource.type.equals("text/html")) {
-                            URI baseUri = URI.create(resource.url);
-                            linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
-                        } else {
-                            input.transferTo(output);
-                        }
-                    }
-
-                    System.out.println(resource.path + " " + resource.url + " " + resource.type + " " + linksRewritten);
-                    filelist.write(resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url +
-                            " " + resource.type + " " + resource.status + " " +
-                            (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n");
+            try ( WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
+                WarcRecord record = reader.next().orElseThrow();
+                if (!(record instanceof WarcResponse)) {
+                    throw new IllegalStateException();
                 }
+                WarcResponse response = (WarcResponse) record;
+
+                Path path = outDir.resolve(resource.path);
+                File f = new File(resource.path);
+                if (f.exists() && !f.isFile()) {
+                    f.delete();
+                }
+                Files.createDirectories(path.getParent());
+
+                long linksRewritten = 0;
+                try ( OutputStream output = Files.newOutputStream(path)) {
+                    InputStream input = response.http().body().stream();
+                    if (resource.isRedirect()) {
+                        String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
+                        if (destination == null) {
+                            destination = resource.locationHeader;
+                        }
+                        output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
+                    } else if (resource.type.equals("text/html")) {
+                        URI baseUri = URI.create(resource.url);
+                        linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
+                    } else {
+                        input.transferTo(output);
+                    }
+                }
+
+                System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + "\n" + linksRewritten);
+
+                Path fileListPath = outDir.resolve(resource.path.split("/")[0] + ".txt");
+                var filelist = Files.newBufferedWriter(fileListPath, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                filelist.write(resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url + " " + resource.type + " " + resource.status + " " + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n");
             }
+            System.out.println("-----------------");
         }
     }
-
 
     private String rewriteLink(String url, URI baseUri, String basePath) {
 
@@ -257,7 +272,9 @@ public class Warc2Html {
             return null;
         }
         Resource resource = resourcesByUrlKey.get(makeUrlKey(uri.toString()));
-        if (resource == null) return null;
+        if (resource == null) {
+            return null;
+        }
         return PathUtils.relativize(resource.path, basePath);
     }
 
