@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import java.nio.file.StandardOpenOption;
 import static java.time.ZoneOffset.UTC;
 
 public class Warc2Html {
@@ -219,42 +220,46 @@ public class Warc2Html {
 
     public void writeTo(Path outDir) throws IOException {
         Files.createDirectories(outDir);
-        try ( var filelist = Files.newBufferedWriter(outDir.resolve("filelist.txt"))) {
-            for (Resource resource : resourcesByPath.values()) {
-                try ( WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
-                    WarcRecord record = reader.next().orElseThrow();
-                    if (!(record instanceof WarcResponse)) {
-                        throw new IllegalStateException();
-                    }
-                    WarcResponse response = (WarcResponse) record;
 
-                    Path path = outDir.resolve(resource.path);
-                    File f = new File(resource.path);
-                    if (f.exists() && !f.isFile()) {
-                        f.delete();
-                    }
-                    Files.createDirectories(path.getParent());
+        for (Resource resource : resourcesByPath.values()) {
 
-                    long linksRewritten = 0;
-                    try ( OutputStream output = Files.newOutputStream(path)) {
-                        InputStream input = response.http().body().stream();
-                        if (resource.isRedirect()) {
-                            String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
-                            if (destination == null) {
-                                destination = resource.locationHeader;
-                            }
-                            output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
-                        } else if (resource.type.equals("text/html")) {
-                            URI baseUri = URI.create(resource.url);
-                            linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
-                        } else {
-                            input.transferTo(output);
-                        }
-                    }
-
-                    System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + " " + linksRewritten);
-                    filelist.write(resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url + " " + resource.type + " " + resource.status + " " + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n");
+            try ( WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
+                WarcRecord record = reader.next().orElseThrow();
+                if (!(record instanceof WarcResponse)) {
+                    throw new IllegalStateException();
                 }
+                WarcResponse response = (WarcResponse) record;
+
+                Path path = outDir.resolve(resource.path);
+                File f = new File(resource.path);
+                if (f.exists() && !f.isFile()) {
+                    f.delete();
+                }
+                Files.createDirectories(path.getParent());
+
+                long linksRewritten = 0;
+                try ( OutputStream output = Files.newOutputStream(path)) {
+                    InputStream input = response.http().body().stream();
+                    if (resource.isRedirect()) {
+                        String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
+                        if (destination == null) {
+                            destination = resource.locationHeader;
+                        }
+                        output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
+                    } else if (resource.type.equals("text/html")) {
+                        URI baseUri = URI.create(resource.url);
+                        linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
+                    } else {
+                        input.transferTo(output);
+                    }
+                }
+
+                System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + " " + linksRewritten);
+                System.out.println("---------------");
+
+                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".txt").toString();
+                String logStr = resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url + " " + resource.type + " " + resource.status + " " + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n";
+                Files.write(Paths.get(fileListPath), logStr.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             }
         }
     }
