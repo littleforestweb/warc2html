@@ -191,10 +191,8 @@ public class Warc2Html {
             keepExisting = false;
         } else if (resource.isRedirect() && !existing.isRedirect()) {
             keepExisting = true;
-        } else if (resource.instant.isBefore(existing.instant)) {
-            keepExisting = true;
         } else {
-            keepExisting = false;
+            keepExisting = resource.instant.isBefore(existing.instant);
         }
 
         if (!keepExisting) {
@@ -231,6 +229,10 @@ public class Warc2Html {
                     WarcResponse response = (WarcResponse) record;
 
                     Path path = outDir.resolve(resource.path);
+                    File f = new File(resource.path);
+                    if (f.exists() && !f.isFile()) {
+                        f.delete();
+                    }
                     Files.createDirectories(path.getParent());
 
                     long linksRewritten = 0;
@@ -250,10 +252,8 @@ public class Warc2Html {
                         }
                     }
 
-                    System.out.println(resource.path + " " + resource.url + " " + resource.type + " " + linksRewritten);
-                    filelist.write(resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url
-                            + " " + resource.type + " " + resource.status + " "
-                            + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n");
+                    System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + " " + linksRewritten);
+                    filelist.write(resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url + " " + resource.type + " " + resource.status + " " + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n");
                 }
             }
         }
