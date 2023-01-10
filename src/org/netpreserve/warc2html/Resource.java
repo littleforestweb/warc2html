@@ -2,12 +2,12 @@
  * Copyright 2021 National Library of Australia
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.netpreserve.warc2html;
 
 import java.time.Instant;
 
 class Resource {
+
     final String url;
     final Instant instant;
     final int status;

@@ -2,25 +2,26 @@
  * Copyright 2021 National Library of Australia
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.netpreserve.warc2html;
 
 import org.netpreserve.urlcanon.Canonicalizer;
 import org.netpreserve.urlcanon.ParsedUrl;
-
 
 import java.util.regex.Pattern;
 
 import static java.util.regex.Pattern.CASE_INSENSITIVE;
 
 public class PathUtils {
+
     private static final Pattern BAD_FILENAME_PATTERN = Pattern.compile("[\\x00-\\x1f<>:\"/\\\\|?*]");
     private static final Pattern WINDOWS_RESERVED_NAMES = Pattern.compile("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?=$|\\.)", CASE_INSENSITIVE);
 
     public static String replaceBadFilenameChars(String filename) {
         filename = BAD_FILENAME_PATTERN.matcher(filename).replaceAll("_");
         filename = WINDOWS_RESERVED_NAMES.matcher(filename).replaceAll("$1_");
-        if (filename.endsWith(".")) filename += "_";
+        if (filename.endsWith(".")) {
+            filename += "_";
+        }
         return filename;
     }
 
@@ -46,13 +47,17 @@ public class PathUtils {
         builder.append("/");
         String[] segments = parsedUrl.getPath().split("/", -1);
         for (int i = 0; i < segments.length - 1; i++) {
-            if (segments[i].isEmpty()) continue;
+            if (segments[i].isEmpty()) {
+                continue;
+            }
             builder.append(replaceBadFilenameChars(segments[i]));
             builder.append("/");
         }
 
         String filename = replaceBadFilenameChars(segments[segments.length - 1]);
-        if (filename.isEmpty()) filename = "index.html";
+        if (filename.isEmpty()) {
+            filename = "index.html";
+        }
         String[] basenameAndExtension = splitExtension(filename);
         String basename = basenameAndExtension[0];
         String extension = basenameAndExtension[1];

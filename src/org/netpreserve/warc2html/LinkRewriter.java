@@ -2,7 +2,6 @@
  * Copyright 2021 National Library of Australia
  * SPDX-License-Identifier: Apache-2.0
  */
-
 package org.netpreserve.warc2html;
 
 import net.htmlparser.jericho.CharacterReference;
@@ -14,13 +13,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.net.URI;
-import java.util.Locale;
 import java.util.function.Function;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class LinkRewriter {
+
     private static final Pattern CSS_URL_PATTERN = Pattern.compile("(?<=[\\s:]url\\()\\s*([^ \"')]+|\"[^\"]+\"|'[^']+')\\s*(?=\\))");
 
     static String rewriteCSS(String css, Function<String, String> urlMapping) {
@@ -30,7 +27,9 @@ public class LinkRewriter {
                 url = url.substring(1, url.length() - 1);
             }
             String replacement = urlMapping.apply(url);
-            if (replacement == null || url.equals(replacement)) return match.group();
+            if (replacement == null || url.equals(replacement)) {
+                return match.group();
+            }
             return replacement.replaceAll("([\"')])", "\\$1");
         });
     }
@@ -51,10 +50,14 @@ public class LinkRewriter {
         }
         for (var tag : source.getAllStartTags()) {
             for (var attr : tag.getURIAttributes()) {
-                if (!attr.hasValue()) continue;
+                if (!attr.hasValue()) {
+                    continue;
+                }
                 String url = attr.getValue();
                 String rewritten = urlMapping.apply(url);
-                if (rewritten == null || rewritten.equals(url)) continue;
+                if (url.startsWith("#") || rewritten == null || rewritten.equals(url)) {
+                    continue;
+                }
 
                 String replacement = "\"" + CharacterReference.encode(rewritten, true) + "\"";
                 outputDocument.replace(attr.getValueSegmentIncludingQuotes(), replacement);
@@ -63,7 +66,9 @@ public class LinkRewriter {
         }
 
         String encoding = source.getEncoding();
-        if (encoding == null) encoding = "iso-8859-1"; // seems to be what jericho defaults to for reading
+        if (encoding == null) {
+            encoding = "iso-8859-1"; // seems to be what jericho defaults to for reading
+        }
         outputDocument.writeTo(new OutputStreamWriter(output, encoding));
 
         return linksRewritten;

@@ -25,6 +25,9 @@ import java.util.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import java.nio.file.StandardOpenOption;
 import static java.time.ZoneOffset.UTC;
+import net.htmlparser.jericho.OutputDocument;
+import net.htmlparser.jericho.Source;
+import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
 
 public class Warc2Html {
 
@@ -36,6 +39,8 @@ public class Warc2Html {
     private String warcBaseLocation = "";
 
     public static void main(String[] args) throws IOException {
+        System.out.println("Initializing");
+
         Warc2Html warc2Html = new Warc2Html();
         Path outputDir = Paths.get(".");
 
@@ -61,49 +66,20 @@ public class Warc2Html {
                         return;
                 }
             } else {
-                try ( InputStream stream = new FileInputStream(args[i])) {
+                try (InputStream stream = new FileInputStream(args[i])) {
                     warc2Html.load(args[i], stream);
                 }
             }
         }
 
         warc2Html.resolveRedirects();
+        System.out.println("-------------------");
         warc2Html.writeTo(outputDir);
-    }
-
-    public static String makeUrlKey(String url) {
-        ParsedUrl parsedUrl = ParsedUrl.parseUrl(url);
-        Canonicalizer.AGGRESSIVE.canonicalize(parsedUrl);
-        return parsedUrl.toString();
-    }
-
-    private static String ensureUniquePath(Map<String, Resource> pathIndex, String path) {
-        if (pathIndex.containsKey(path)) {
-            String[] basenameAndExtension = PathUtils.splitExtension(path);
-            for (long i = 1; pathIndex.containsKey(path); i++) {
-                path = basenameAndExtension[0] + "~" + i + basenameAndExtension[1];
-            }
-        }
-        return path;
-    }
-
-    private static Map<String, String> loadForcedExtensions() {
-        try ( var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
-            var map = new HashMap<String, String>();
-            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                String[] fields = line.strip().split("\\s+");
-                map.put(fields[0], fields[1]);
-            }
-            return Collections.unmodifiableMap(map);
-        } catch (IOException e) {
-            throw new RuntimeException("Error loading forced.extensions", e);
-        }
+        System.out.println("Finished");
     }
 
     private void load(String filename, InputStream stream) throws IOException {
+        System.out.println("Load - " + filename);
         if (!stream.markSupported()) {
             stream = new BufferedInputStream(stream);
         }
@@ -169,6 +145,59 @@ public class Warc2Html {
         }
     }
 
+    protected WarcReader openWarc(String filename, long offset, long length) throws IOException {
+        String pathOrUrl = warcBaseLocation + filename;
+        if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+            var connection = (HttpURLConnection) new URL(pathOrUrl).openConnection();
+            if (length > 0) {
+                connection.addRequestProperty("Range", "bytes=" + offset + "-" + (offset + length - 1));
+            } else if (offset > 0) {
+                connection.addRequestProperty("Range", "bytes=" + offset + "-");
+            }
+            return new WarcReader(connection.getInputStream());
+        } else {
+            FileChannel channel = FileChannel.open(Paths.get(pathOrUrl));
+            channel.position(offset);
+            return new WarcReader(channel);
+        }
+    }
+
+    public void setWarcBaseLocation(String warcBaseLocation) {
+        this.warcBaseLocation = warcBaseLocation;
+    }
+
+    public static String makeUrlKey(String url) {
+        ParsedUrl parsedUrl = ParsedUrl.parseUrl(url);
+        Canonicalizer.AGGRESSIVE.canonicalize(parsedUrl);
+        return parsedUrl.toString();
+    }
+
+    private static String ensureUniquePath(Map<String, Resource> pathIndex, String path) {
+        if (pathIndex.containsKey(path)) {
+            String[] basenameAndExtension = PathUtils.splitExtension(path);
+            for (long i = 1; pathIndex.containsKey(path); i++) {
+                path = basenameAndExtension[0] + "~" + i + basenameAndExtension[1];
+            }
+        }
+        return path;
+    }
+
+    private static Map<String, String> loadForcedExtensions() {
+        try ( var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
+            var map = new HashMap<String, String>();
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] fields = line.strip().split("\\s+");
+                map.put(fields[0], fields[1]);
+            }
+            return Collections.unmodifiableMap(map);
+        } catch (IOException e) {
+            throw new RuntimeException("Error loading forced.extensions", e);
+        }
+    }
+
     private void add(Resource resource) {
         if (resource.status >= 400) {
             return;
@@ -201,29 +230,19 @@ public class Warc2Html {
         }
     }
 
-    protected WarcReader openWarc(String filename, long offset, long length) throws IOException {
-        String pathOrUrl = warcBaseLocation + filename;
-        if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
-            var connection = (HttpURLConnection) new URL(pathOrUrl).openConnection();
-            if (length > 0) {
-                connection.addRequestProperty("Range", "bytes=" + offset + "-" + (offset + length - 1));
-            } else if (offset > 0) {
-                connection.addRequestProperty("Range", "bytes=" + offset + "-");
-            }
-            return new WarcReader(connection.getInputStream());
-        } else {
-            FileChannel channel = FileChannel.open(Paths.get(pathOrUrl));
-            channel.position(offset);
-            return new WarcReader(channel);
-        }
-    }
-
     public void writeTo(Path outDir) throws IOException {
         Files.createDirectories(outDir);
 
-        for (Resource resource : resourcesByPath.values()) {
+        int idx = 0;
+        int resourcesSize = resourcesByPath.values().size() - 1;
 
-            try ( WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
+        for (Resource resource : resourcesByPath.values()) {
+            try {
+                WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
+                System.out.println("---------------");
+                String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
+                System.out.println("Progress: " + progressPercentage + "%");
+
                 WarcRecord record = reader.next().orElseThrow();
                 if (!(record instanceof WarcResponse)) {
                     throw new IllegalStateException();
@@ -232,13 +251,13 @@ public class Warc2Html {
 
                 Path path = outDir.resolve(resource.path);
                 File f = new File(resource.path);
-                if (f.exists() && !f.isFile()) {
+                if (f.exists() && f.isFile()) {
                     f.delete();
                 }
                 Files.createDirectories(path.getParent());
 
                 long linksRewritten = 0;
-                try ( OutputStream output = Files.newOutputStream(path)) {
+                try (OutputStream output = Files.newOutputStream(path)) {
                     InputStream input = response.http().body().stream();
                     if (resource.isRedirect()) {
                         String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
@@ -252,14 +271,45 @@ public class Warc2Html {
                     } else {
                         input.transferTo(output);
                     }
+
+                    if (resource.type.equals("text/css")) {
+                        System.out.println("URL");
+                        String css = Files.readString(path);
+                        URI baseUri = URI.create(resource.url);
+                        String rewritten = rewriteCSS(css, url -> rewriteLink(url, baseUri, resource.path));
+                        FileWriter modFile = new FileWriter(path.toFile());
+                        modFile.write(rewritten);
+                        modFile.close();
+                    }
                 }
 
+                // Show console log
                 System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + " " + linksRewritten);
-                System.out.println("---------------");
 
-                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".txt").toString();
-                String logStr = resource.path + " " + ARC_DATE_FORMAT.format(resource.instant) + " " + resource.url + " " + resource.type + " " + resource.status + " " + (resource.locationHeader == null ? "-" : resource.locationHeader) + "\r\n";
-                Files.write(Paths.get(fileListPath), logStr.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                // Add to LOG_FILE
+                String resourceJson = "{";
+                resourceJson += "\"progress\":\"" + progressPercentage + "\"" + ", ";
+                resourceJson += "\"path\":\"" + resource.path + "\"" + ", ";
+                resourceJson += "\"url\":\"" + resource.url + "\"" + ", ";
+                resourceJson += "\"type\":\"" + resource.type + "\"" + ", ";
+                resourceJson += "\"status\":\"" + resource.status + "\"" + ", ";
+                resourceJson += "\"occurrences\":\"" + linksRewritten + "\"";
+                resourceJson += "}";
+                String jsonContent;
+                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".json").toString();
+                if (!(new File(fileListPath).exists())) {
+                    jsonContent = "[" + resourceJson + "]";
+                } else {
+                    String fileContent = Files.readString(Path.of(fileListPath));
+                    new File(fileListPath).delete();
+                    jsonContent = fileContent.substring(0, fileContent.length() - 1) + "," + resourceJson + "]";
+                }
+                Files.writeString(Paths.get(fileListPath), jsonContent, StandardOpenOption.CREATE);
+
+                idx += 1;
+            } catch (Exception ex) {
+                System.out.println("Failed");
+                System.out.println(ex.toString());
             }
         }
     }
@@ -277,10 +327,6 @@ public class Warc2Html {
             return null;
         }
         return PathUtils.relativize(resource.path, basePath);
-    }
-
-    public void setWarcBaseLocation(String warcBaseLocation) {
-        this.warcBaseLocation = warcBaseLocation;
     }
 
     public void resolveRedirects() {
