@@ -277,9 +277,9 @@ public class Warc2Html {
                         String css = Files.readString(path);
                         URI baseUri = URI.create(resource.url);
                         String rewritten = rewriteCSS(css, url -> rewriteLink(url, baseUri, resource.path));
-                        FileWriter modFile = new FileWriter(path.toFile());
-                        modFile.write(rewritten);
-                        modFile.close();
+                        try (FileWriter modFile = new FileWriter(path.toFile())) {
+                            modFile.write(rewritten);
+                        }
                     }
                 }
 
