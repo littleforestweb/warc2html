@@ -25,8 +25,6 @@ import java.util.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import java.nio.file.StandardOpenOption;
 import static java.time.ZoneOffset.UTC;
-import net.htmlparser.jericho.OutputDocument;
-import net.htmlparser.jericho.Source;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
 
 public class Warc2Html {
@@ -204,8 +202,7 @@ public class Warc2Html {
         }
 
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
-
-        path = ensureUniquePath(resourcesByPath, path);
+        // path = ensureUniquePath(resourcesByPath, path);
 
         resource.path = path;
         resourcesByPath.put(path, resource);
