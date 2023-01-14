@@ -139,7 +139,9 @@ public class Warc2Html {
             record = reader.next().orElse(null);
             long length = reader.position() - offset;
 
-            add(new Resource(url, instant, status, type, filename, offset, length, locationHeader));
+            if (status == 200) {
+                add(new Resource(url, instant, status, type, filename, offset, length, locationHeader));
+            }
         }
     }
 
@@ -202,7 +204,7 @@ public class Warc2Html {
         }
 
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
-        // path = ensureUniquePath(resourcesByPath, path);
+        path = ensureUniquePath(resourcesByPath, path);
 
         resource.path = path;
         resourcesByPath.put(path, resource);
