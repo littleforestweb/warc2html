@@ -54,12 +54,12 @@ public class LinkRewriter {
                     continue;
                 }
                 String url = attr.getValue();
-                String rewritten = urlMapping.apply(url);
+                String rewritten = urlMapping.apply(url.replaceAll(" ", "%20"));
                 if (url.startsWith("#") || rewritten == null || rewritten.equals(url)) {
                     continue;
                 }
 
-                String replacement = "\"" + CharacterReference.encode(rewritten, true) + "\"";
+                String replacement = "\"" + rewritten.replaceAll("%20", "%2520") + "\"";
                 outputDocument.replace(attr.getValueSegmentIncludingQuotes(), replacement);
                 linksRewritten++;
             }
