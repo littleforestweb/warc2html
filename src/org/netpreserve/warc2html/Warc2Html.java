@@ -139,9 +139,7 @@ public class Warc2Html {
             record = reader.next().orElse(null);
             long length = reader.position() - offset;
 
-            if (status == 200) {
-                add(new Resource(url, instant, status, type, filename, offset, length, locationHeader));
-            }
+            add(new Resource(url, instant, status, type, filename, offset, length, locationHeader));
         }
     }
 
@@ -272,7 +270,6 @@ public class Warc2Html {
                     }
 
                     if (resource.type.equals("text/css")) {
-                        System.out.println("URL");
                         String css = Files.readString(path);
                         URI baseUri = URI.create(resource.url);
                         String rewritten = rewriteCSS(css, url -> rewriteLink(url, baseUri, resource.path));
