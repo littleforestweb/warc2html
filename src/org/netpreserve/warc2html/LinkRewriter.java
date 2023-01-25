@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 public class LinkRewriter {
 
     private static final Pattern CSS_URL_PATTERN = Pattern.compile("(?<=[\\s:]url\\()\\s*([^ \"')]+|\"[^\"]+\"|'[^']+')\\s*(?=\\))");
+    private static final Pattern JS_URL_PATTERN = Pattern.compile("href=\\\"(.*?)\\\"");
 
     static String rewriteCSS(String css, Function<String, String> urlMapping) {
         return CSS_URL_PATTERN.matcher(css).replaceAll(match -> {
@@ -34,11 +35,28 @@ public class LinkRewriter {
         });
     }
 
+    static String rewriteJS(String js, Function<String, String> urlMapping, String rndStr) {
+        return JS_URL_PATTERN.matcher(js).replaceAll(match -> {
+            String url = match.group(1);
+
+            if (!(url.startsWith("/"))) {
+                return "href=\"" + url + "\"";
+            }
+
+            if (url.startsWith("\"") || url.startsWith("'")) {
+                url = url.substring(1, url.length() - 1);
+            }
+
+            String replacement = urlMapping.apply(url);
+            replacement = "href=\"' + " + rndStr + "_relativePath + '" + replacement + "\"";
+            return replacement;
+        });
+    }
+
     public static long rewriteHTML(InputStream input, OutputStream output, Function<String, String> urlMapping) throws IOException {
         Source source = new Source(input);
         OutputDocument outputDocument = new OutputDocument(source);
         long linksRewritten = 0;
-
         source.fullSequentialParse();
 
         for (var el : source.getAllElements(HTMLElementName.STYLE)) {
@@ -54,12 +72,17 @@ public class LinkRewriter {
                     continue;
                 }
                 String url = attr.getValue();
-                String rewritten = urlMapping.apply(url.replaceAll(" ", "%20"));
-                if (url.startsWith("#") || rewritten == null || rewritten.equals(url)) {
+
+                url = url.replaceAll(" ", "%20");
+                url = url.replaceAll("\\[", "%5B");
+                url = url.replaceAll("\\]", "%5D");
+
+                String rewritten = urlMapping.apply(url);
+                if (rewritten == null || rewritten.equals(url)) {
                     continue;
                 }
 
-                String replacement = "\"" + rewritten.replaceAll("%20", "%2520") + "\"";
+                String replacement = "\"" + CharacterReference.encode(rewritten, true) + "\"";
                 outputDocument.replace(attr.getValueSegmentIncludingQuotes(), replacement);
                 linksRewritten++;
             }

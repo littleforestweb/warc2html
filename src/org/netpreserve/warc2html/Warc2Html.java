@@ -21,11 +21,13 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.net.URLDecoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import java.nio.file.StandardOpenOption;
 import static java.time.ZoneOffset.UTC;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
+import static org.netpreserve.warc2html.LinkRewriter.rewriteJS;
 
 public class Warc2Html {
 
@@ -197,12 +199,12 @@ public class Warc2Html {
     }
 
     private void add(Resource resource) {
+        String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
+        path = ensureUniquePath(resourcesByPath, path);
+
         if (resource.status >= 400) {
             return;
         }
-
-        String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
-        path = ensureUniquePath(resourcesByPath, path);
 
         resource.path = path;
         resourcesByPath.put(path, resource);
@@ -227,6 +229,16 @@ public class Warc2Html {
         }
     }
 
+    private String getAlphaNumericString(int n) {
+        String AlphaNumericString = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvxyz";
+        StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) {
+            int index = (int) (AlphaNumericString.length() * Math.random());
+            sb.append(AlphaNumericString.charAt(index));
+        }
+        return sb.toString();
+    }
+
     public void writeTo(Path outDir) throws IOException {
         Files.createDirectories(outDir);
 
@@ -234,10 +246,11 @@ public class Warc2Html {
         int resourcesSize = resourcesByPath.values().size() - 1;
 
         for (Resource resource : resourcesByPath.values()) {
+
             try {
                 WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
-                System.out.println("---------------");
                 String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
+                System.out.println("---------------");
                 System.out.println("Progress: " + progressPercentage + "%");
 
                 WarcRecord record = reader.next().orElseThrow();
@@ -246,11 +259,7 @@ public class Warc2Html {
                 }
                 WarcResponse response = (WarcResponse) record;
 
-                Path path = outDir.resolve(resource.path);
-                File f = new File(resource.path);
-                if (f.exists() && f.isFile()) {
-                    f.delete();
-                }
+                Path path = outDir.resolve(URLDecoder.decode(resource.path, "UTF-8"));
                 Files.createDirectories(path.getParent());
 
                 long linksRewritten = 0;
@@ -273,6 +282,26 @@ public class Warc2Html {
                         String css = Files.readString(path);
                         URI baseUri = URI.create(resource.url);
                         String rewritten = rewriteCSS(css, url -> rewriteLink(url, baseUri, resource.path));
+                        try (FileWriter modFile = new FileWriter(path.toFile())) {
+                            modFile.write(rewritten);
+                        }
+                    }
+
+                    if (resource.type.contains("javascript")) {
+                        String js = Files.readString(path);
+                        String rndStr = getAlphaNumericString(16);
+                        String rewritten = rewriteJS(js, url -> url, rndStr);
+
+                        rewritten = ""
+                                + "var " + rndStr + "_pathname = window.location.pathname;" + "\n"
+                                + "var " + rndStr + "_resourcePath = \"" + resource.path + "\";" + "\n"
+                                + "var " + rndStr + "_pathSplit = " + rndStr + "_resourcePath.split(\"/\")[0];" + "\n"
+                                + "var " + rndStr + "_pathname_split = " + rndStr + "_pathname.split(" + rndStr + "_pathSplit)[1].replace(\"//\", \"/\");" + "\n"
+                                + "var " + rndStr + "_foldersNumb = " + rndStr + "_pathname_split.split(\"/\").filter(function(item){if (item !== \"\" && !item.endsWith(\".html\")) {return item;}});" + "\n"
+                                + "var " + rndStr + "_relativePath = '';" + "\n"
+                                + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n\n"
+                                + rewritten;
+
                         try (FileWriter modFile = new FileWriter(path.toFile())) {
                             modFile.write(rewritten);
                         }
