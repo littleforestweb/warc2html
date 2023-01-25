@@ -75,6 +75,7 @@ public class Warc2Html {
         warc2Html.resolveRedirects();
         System.out.println("-------------------");
         warc2Html.writeTo(outputDir);
+        System.out.println("-------------------");
         System.out.println("Finished");
     }
 
@@ -229,7 +230,7 @@ public class Warc2Html {
         }
     }
 
-    private String getAlphaNumericString(int n) {
+    public String getAlphaNumericString(int n) {
         String AlphaNumericString = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvxyz";
         StringBuilder sb = new StringBuilder(n);
         for (int i = 0; i < n; i++) {
@@ -237,6 +238,14 @@ public class Warc2Html {
             sb.append(AlphaNumericString.charAt(index));
         }
         return sb.toString();
+    }
+
+    public String removeTilda(String url) {
+        url = new StringBuilder(url).reverse().toString();
+        for (int i = 0; i <= 9; i++) {
+            url = url.replace("lmth." + String.valueOf(i) + "~", "lmth.");
+        }
+        return new StringBuilder(url).reverse().toString();
     }
 
     public void writeTo(Path outDir) throws IOException {
@@ -267,10 +276,23 @@ public class Warc2Html {
                     InputStream input = response.http().body().stream();
                     if (resource.isRedirect()) {
                         String destination = rewriteLink(resource.locationHeader, URI.create(resource.url), resource.path);
+
                         if (destination == null) {
                             destination = resource.locationHeader;
                         }
-                        output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
+
+                        output.write(("<!-- Redirected From : " + resource.url + " -->\n").getBytes(UTF_8));
+                        if (!destination.isBlank() && !destination.isEmpty()) {
+                            output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
+                        } else {
+                            output.write(("<!-- Change to HTTPS -->\n").getBytes(UTF_8));
+                            String tempUrl = resource.url.replace("http://", "https://");
+                            String tempPath = removeTilda(resource.path);
+                            destination = rewriteLink(resource.locationHeader, URI.create(tempUrl), tempPath);
+                            destination = removeTilda(destination);
+                            output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
+                        }
+
                     } else if (resource.type.equals("text/html")) {
                         URI baseUri = URI.create(resource.url);
                         linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
@@ -291,7 +313,6 @@ public class Warc2Html {
                         String js = Files.readString(path);
                         String rndStr = getAlphaNumericString(16);
                         String rewritten = rewriteJS(js, url -> url, rndStr);
-
                         rewritten = ""
                                 + "var " + rndStr + "_pathname = window.location.pathname;" + "\n"
                                 + "var " + rndStr + "_resourcePath = \"" + resource.path + "\";" + "\n"
@@ -301,7 +322,6 @@ public class Warc2Html {
                                 + "var " + rndStr + "_relativePath = '';" + "\n"
                                 + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n\n"
                                 + rewritten;
-
                         try (FileWriter modFile = new FileWriter(path.toFile())) {
                             modFile.write(rewritten);
                         }
@@ -309,7 +329,7 @@ public class Warc2Html {
                 }
 
                 // Show console log
-                System.out.println(resource.path + "\n" + resource.url + "\n" + resource.type + " " + linksRewritten);
+                System.out.println(resource.url);
 
                 // Add to LOG_FILE
                 String resourceJson = "{";
@@ -335,6 +355,10 @@ public class Warc2Html {
             } catch (Exception ex) {
                 System.out.println("Failed");
                 System.out.println(ex.toString());
+                System.out.println("resource.path : " + resource.path);
+                System.out.println("resource.url : " + resource.url);
+                System.out.println("resource.type : " + resource.type);
+                System.out.println("resource.status : " + resource.status);
             }
         }
     }
