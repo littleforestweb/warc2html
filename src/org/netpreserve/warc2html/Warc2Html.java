@@ -256,6 +256,10 @@ public class Warc2Html {
 
         for (Resource resource : resourcesByPath.values()) {
 
+//            if (!(resource.path.contains("/global/en/index.html"))) {
+//                continue;
+//            }
+
             try {
                 WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
                 String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
