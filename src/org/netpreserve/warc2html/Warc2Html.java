@@ -256,7 +256,8 @@ public class Warc2Html {
 
         for (Resource resource : resourcesByPath.values()) {
 
-//            if (!(resource.path.contains("/global/en/index.html"))) {
+//            if (!(resource.path.contains("/global/en/index.html"))
+//                    && !(resource.path.contains("/global/en/where/europe/ireland/overview/careers/ni_careers/ni_graduate_recruitment"))) {
 //                continue;
 //            }
 

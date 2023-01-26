@@ -82,7 +82,7 @@ public class LinkRewriter {
             URIAttrs.addAll(tag.getURIAttributes());
 
             for (var attr : URIAttrs) {
-                if (!attr.hasValue() || attr.toString().startsWith("usemap") || attr.toString().contains("\"#\"")) {
+                if (!attr.hasValue() || attr.toString().startsWith("usemap")) {
                     continue;
                 }
 
@@ -92,7 +92,7 @@ public class LinkRewriter {
                 url = url.replaceAll("\\]", "%5D");
 
                 String rewritten = urlMapping.apply(url);
-                if (rewritten == null || rewritten.equals(url)) {
+                if (url.startsWith("#") || rewritten == null || rewritten.equals(url)) {
                     continue;
                 }
 
