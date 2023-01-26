@@ -13,8 +13,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import net.htmlparser.jericho.Attribute;
 
 public class LinkRewriter {
 
@@ -66,13 +68,25 @@ public class LinkRewriter {
                 outputDocument.replace(el.getContent(), rewritten);
             }
         }
+
         for (var tag : source.getAllStartTags()) {
-            for (var attr : tag.getURIAttributes()) {
+
+            ArrayList<Attribute> URIAttrs = new ArrayList<>();
+            if (tag.toString().startsWith("<area") || tag.toString().startsWith("<a")) {
+                for (var attr : tag.getAttributes()) {
+                    if (attr.hasValue() && attr.toString().startsWith("data-src")) {
+                        URIAttrs.add(attr);
+                    }
+                }
+            }
+            URIAttrs.addAll(tag.getURIAttributes());
+
+            for (var attr : URIAttrs) {
                 if (!attr.hasValue()) {
                     continue;
                 }
-                String url = attr.getValue();
 
+                String url = attr.getValue();
                 url = url.replaceAll(" ", "%20");
                 url = url.replaceAll("\\[", "%5B");
                 url = url.replaceAll("\\]", "%5D");
