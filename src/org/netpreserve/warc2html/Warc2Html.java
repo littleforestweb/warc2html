@@ -260,7 +260,6 @@ public class Warc2Html {
 //                    && !(resource.path.contains("/global/en/where/europe/ireland/overview/careers/ni_careers/ni_graduate_recruitment"))) {
 //                continue;
 //            }
-
             try {
                 WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
                 String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
@@ -337,24 +336,25 @@ public class Warc2Html {
                 System.out.println(resource.url);
 
                 // Add to LOG_FILE
-                String resourceJson = "{";
-                resourceJson += "\"progress\":\"" + progressPercentage + "\"" + ", ";
-                resourceJson += "\"path\":\"" + resource.path + "\"" + ", ";
-                resourceJson += "\"url\":\"" + resource.url + "\"" + ", ";
-                resourceJson += "\"type\":\"" + resource.type + "\"" + ", ";
-                resourceJson += "\"status\":\"" + resource.status + "\"" + ", ";
-                resourceJson += "\"occurrences\":\"" + linksRewritten + "\"";
-                resourceJson += "}";
-                String jsonContent;
-                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".json").toString();
+                String fullLog;
+                String resourceLog = "progress : " + progressPercentage + "\n";
+                resourceLog += "path : " + URLDecoder.decode(resource.path, "UTF-8") + "\n";
+                resourceLog += "url : " + resource.url + "\n";
+                resourceLog += "type : " + resource.type + "\n";
+                resourceLog += "status : " + resource.status + "\n";
+                resourceLog += "occurrences : " + linksRewritten + "\n";
+                resourceLog += "__NEW__RESOURCE__";
+
+                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".log").toString();
                 if (!(new File(fileListPath).exists())) {
-                    jsonContent = "[" + resourceJson + "]";
+                    fullLog = resourceLog;
                 } else {
                     String fileContent = Files.readString(Path.of(fileListPath));
                     new File(fileListPath).delete();
-                    jsonContent = fileContent.substring(0, fileContent.length() - 1) + "," + resourceJson + "]";
+                    fullLog = fileContent + "\n" + resourceLog;
                 }
-                Files.writeString(Paths.get(fileListPath), jsonContent, StandardOpenOption.CREATE);
+
+                Files.writeString(Paths.get(fileListPath), fullLog, StandardOpenOption.CREATE);
 
                 idx += 1;
             } catch (Exception ex) {
