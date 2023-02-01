@@ -230,7 +230,7 @@ public class Warc2Html {
         }
     }
 
-    public String getAlphaNumericString(int n) {
+    public String getRandomAlphaString(int n) {
         String AlphaNumericString = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvxyz";
         StringBuilder sb = new StringBuilder(n);
         for (int i = 0; i < n; i++) {
@@ -311,9 +311,11 @@ public class Warc2Html {
 
                     if (resource.type.contains("javascript")) {
                         String js = Files.readString(path);
-                        String rndStr = getAlphaNumericString(16);
+                        String rndStr = getRandomAlphaString(16);
                         String rewritten = rewriteJS(js, url -> url, rndStr);
                         rewritten = ""
+                                + "// -------------------------------------------------------- " + "\n"
+                                + "// " + rndStr + "\n"
                                 + "var " + rndStr + "_pathname = window.location.pathname;" + "\n"
                                 + "var " + rndStr + "_basePath = \"" + resource.path.split("/")[0] + "\";" + "\n"
                                 + "var " + rndStr + "_pathname_split = " + rndStr + "_pathname;" + "\n"
@@ -321,7 +323,8 @@ public class Warc2Html {
                                 + rndStr + "_pathname_split = " + rndStr + "_pathname_split.replace(\"//\", \"/\")" + "\n"
                                 + "var " + rndStr + "_foldersNumb = " + rndStr + "_pathname_split.split(\"/\").filter(function(item){if (item !== \"\" && !item.endsWith(\".html\")) {return item;}});" + "\n"
                                 + "var " + rndStr + "_relativePath = '';" + "\n"
-                                + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n\n"
+                                + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n"
+                                + "// -------------------------------------------------------- " + "\n\n"
                                 + rewritten;
                         try (FileWriter modFile = new FileWriter(path.toFile())) {
                             modFile.write(rewritten);
