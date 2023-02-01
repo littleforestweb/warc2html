@@ -256,10 +256,6 @@ public class Warc2Html {
 
         for (Resource resource : resourcesByPath.values()) {
 
-//            if (!(resource.path.contains("/global/en/index.html"))
-//                    && !(resource.path.contains("/global/en/where/europe/ireland/overview/careers/ni_careers/ni_graduate_recruitment"))) {
-//                continue;
-//            }
             try {
                 WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
                 String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
@@ -319,9 +315,10 @@ public class Warc2Html {
                         String rewritten = rewriteJS(js, url -> url, rndStr);
                         rewritten = ""
                                 + "var " + rndStr + "_pathname = window.location.pathname;" + "\n"
-                                + "var " + rndStr + "_resourcePath = \"" + resource.path + "\";" + "\n"
-                                + "var " + rndStr + "_pathSplit = " + rndStr + "_resourcePath.split(\"/\")[0];" + "\n"
-                                + "var " + rndStr + "_pathname_split = " + rndStr + "_pathname.split(" + rndStr + "_pathSplit)[1].replace(\"//\", \"/\");" + "\n"
+                                + "var " + rndStr + "_basePath = \"" + resource.path.split("/")[0] + "\";" + "\n"
+                                + "var " + rndStr + "_pathname_split = " + rndStr + "_pathname;" + "\n"
+                                + "if(" + rndStr + "_pathname.includes(" + rndStr + "_basePath)) {" + rndStr + "_pathname_split = " + rndStr + "_pathname.split(" + rndStr + "_basePath)[1];}" + "\n"
+                                + rndStr + "_pathname_split = " + rndStr + "_pathname_split.replace(\"//\", \"/\")" + "\n"
                                 + "var " + rndStr + "_foldersNumb = " + rndStr + "_pathname_split.split(\"/\").filter(function(item){if (item !== \"\" && !item.endsWith(\".html\")) {return item;}});" + "\n"
                                 + "var " + rndStr + "_relativePath = '';" + "\n"
                                 + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n\n"
@@ -338,7 +335,7 @@ public class Warc2Html {
                 // Add to LOG_FILE
                 String fullLog;
                 String resourceLog = "progress : " + progressPercentage + "\n";
-                resourceLog += "path : " + URLDecoder.decode(resource.path, "UTF-8") + "\n";
+                resourceLog += "path : " + path.toString() + "\n";
                 resourceLog += "url : " + resource.url + "\n";
                 resourceLog += "type : " + resource.type + "\n";
                 resourceLog += "status : " + resource.status + "\n";
