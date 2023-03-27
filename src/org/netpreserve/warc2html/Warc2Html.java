@@ -184,7 +184,7 @@ public class Warc2Html {
     }
 
     private static Map<String, String> loadForcedExtensions() {
-        try ( var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
+        try (var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
             var map = new HashMap<String, String>();
             for (String line = reader.readLine(); line != null; line = reader.readLine()) {
                 if (line.isBlank()) {
@@ -292,7 +292,6 @@ public class Warc2Html {
                             destination = removeTilda(destination);
                             output.write(("<meta http-equiv=\"refresh\" content=\"0; url=" + destination + "\">\n").getBytes(UTF_8));
                         }
-
                     } else if (resource.type.equals("text/html")) {
                         URI baseUri = URI.create(resource.url);
                         linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
@@ -345,7 +344,7 @@ public class Warc2Html {
                 resourceLog += "occurrences : " + linksRewritten + "\n";
                 resourceLog += "__NEW__RESOURCE__";
 
-                String fileListPath = outDir.resolve(resource.path.split("/")[0] + ".log").toString();
+                String fileListPath = outDir.resolve("warcLog.log").toString();
                 if (!(new File(fileListPath).exists())) {
                     fullLog = resourceLog;
                 } else {
