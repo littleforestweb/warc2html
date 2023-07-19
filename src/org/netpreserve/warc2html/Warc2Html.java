@@ -24,7 +24,9 @@ import java.util.*;
 import java.net.URLDecoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+
 import java.nio.file.StandardOpenOption;
+
 import static java.time.ZoneOffset.UTC;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteJS;
@@ -255,9 +257,8 @@ public class Warc2Html {
         int resourcesSize = resourcesByPath.values().size() - 1;
 
         for (Resource resource : resourcesByPath.values()) {
+            try (WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
 
-            try {
-                WarcReader reader = openWarc(resource.warc, resource.offset, resource.length);
                 String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
                 System.out.println("---------------");
                 System.out.println("Progress: " + progressPercentage + "%");
@@ -345,15 +346,14 @@ public class Warc2Html {
                 resourceLog += "__NEW__RESOURCE__";
 
                 String fileListPath = outDir.resolve("warcLog.log").toString();
-                if (!(new File(fileListPath).exists())) {
+                Path logFilePath = Paths.get(fileListPath);
+                if (!Files.exists(logFilePath)) {
                     fullLog = resourceLog;
                 } else {
-                    String fileContent = Files.readString(Path.of(fileListPath));
-                    new File(fileListPath).delete();
+                    String fileContent = Files.readString(logFilePath);
                     fullLog = fileContent + "\n" + resourceLog;
                 }
-
-                Files.writeString(Paths.get(fileListPath), fullLog, StandardOpenOption.CREATE);
+                Files.writeString(logFilePath, fullLog, StandardOpenOption.CREATE);
 
                 idx += 1;
             } catch (Exception ex) {
