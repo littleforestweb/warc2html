@@ -3,3 +3,4 @@
 *.iml
 /data
 .attach_*
+.DS_Store
