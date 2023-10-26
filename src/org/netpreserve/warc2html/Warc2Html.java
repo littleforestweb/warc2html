@@ -246,6 +246,7 @@ public class Warc2Html {
         url = new StringBuilder(url).reverse().toString();
         for (int i = 0; i <= 9; i++) {
             url = url.replace("lmth." + String.valueOf(i) + "~", "lmth.");
+            url = url.replace("egap." + String.valueOf(i) + "~", "lmth.");
         }
         return new StringBuilder(url).reverse().toString();
     }
