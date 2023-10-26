@@ -322,7 +322,7 @@ public class Warc2Html {
                                 + "var " + rndStr + "_pathname_split = " + rndStr + "_pathname;" + "\n"
                                 + "if(" + rndStr + "_pathname.includes(" + rndStr + "_basePath)) {" + rndStr + "_pathname_split = " + rndStr + "_pathname.split(" + rndStr + "_basePath)[1];}" + "\n"
                                 + rndStr + "_pathname_split = " + rndStr + "_pathname_split.replace(\"//\", \"/\")" + "\n"
-                                + "var " + rndStr + "_foldersNumb = " + rndStr + "_pathname_split.split(\"/\").filter(function(item){if (item !== \"\" && !item.endsWith(\".html\")) {return item;}});" + "\n"
+                                + "var " + rndStr + "_foldersNumb = " + rndStr + "_pathname_split.split(\"/\").filter(function(item){if (item !== \"\" && !item.endsWith(\".page\")) {return item;}});" + "\n"
                                 + "var " + rndStr + "_relativePath = '';" + "\n"
                                 + rndStr + "_foldersNumb.forEach(item => " + rndStr + "_relativePath += '../');" + "\n"
                                 + "// -------------------------------------------------------- " + "\n\n"

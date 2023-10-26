@@ -56,7 +56,7 @@ public class PathUtils {
 
         String filename = replaceBadFilenameChars(segments[segments.length - 1]);
         if (filename.isEmpty()) {
-            filename = "index.html";
+            filename = "index.page";
         }
         String[] basenameAndExtension = splitExtension(filename);
         String basename = basenameAndExtension[0];
