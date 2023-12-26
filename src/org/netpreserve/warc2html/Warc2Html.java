@@ -205,7 +205,7 @@ public class Warc2Html {
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
         path = ensureUniquePath(resourcesByPath, path);
 
-        if (resource.status >= 400) {
+        if (resource.status >= 300) {
             return;
         }
 
