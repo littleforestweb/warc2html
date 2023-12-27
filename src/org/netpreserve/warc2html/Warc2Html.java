@@ -4,6 +4,10 @@
  */
 package org.netpreserve.warc2html;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.netpreserve.jwarc.WarcReader;
 import org.netpreserve.jwarc.WarcRecord;
 import org.netpreserve.jwarc.WarcResponse;
@@ -24,8 +28,6 @@ import java.util.*;
 import java.net.URLDecoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-
-import java.nio.file.StandardOpenOption;
 
 import static java.time.ZoneOffset.UTC;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
@@ -74,11 +76,21 @@ public class Warc2Html {
             }
         }
 
-        warc2Html.resolveRedirects();
+        // Run
+        JsonArray resourceArray = warc2Html.writeTo(outputDir);
+
+        // Convert JsonArray to JSON and write to a file
         System.out.println("-------------------");
-        warc2Html.writeTo(outputDir);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String resources_log_path = outputDir.resolve("_leaf_warc_resources.json").toString();
+        try (FileWriter writer = new FileWriter(resources_log_path)) {
+            gson.toJson(resourceArray, writer);
+            System.out.println("JSON resourceArray file created successfully!");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         System.out.println("-------------------");
-        System.out.println("Finished");
     }
 
     private void load(String filename, InputStream stream) throws IOException {
@@ -251,7 +263,10 @@ public class Warc2Html {
         return new StringBuilder(url).reverse().toString();
     }
 
-    public void writeTo(Path outDir) throws IOException {
+    public JsonArray writeTo(Path outDir) throws IOException {
+        // Create an array of JsonObjects
+        JsonArray resourceArray = new JsonArray();
+
         Files.createDirectories(outDir);
 
         int idx = 0;
@@ -260,7 +275,7 @@ public class Warc2Html {
         for (Resource resource : resourcesByPath.values()) {
             try (WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
 
-                String progressPercentage = Float.toString((float) ((idx * 100.0f) / resourcesSize));
+                String progressPercentage = Float.toString((idx * 100.0f) / resourcesSize);
                 System.out.println("---------------");
                 System.out.println("Progress: " + progressPercentage + "%");
 
@@ -270,7 +285,7 @@ public class Warc2Html {
                 }
                 WarcResponse response = (WarcResponse) record;
 
-                Path path = outDir.resolve(URLDecoder.decode(resource.path, "UTF-8"));
+                Path path = outDir.resolve(URLDecoder.decode(resource.path, UTF_8));
                 Files.createDirectories(path.getParent());
 
                 long linksRewritten = 0;
@@ -314,8 +329,7 @@ public class Warc2Html {
                         String js = Files.readString(path);
                         String rndStr = getRandomAlphaString(16);
                         String rewritten = rewriteJS(js, url -> url, rndStr);
-                        rewritten = ""
-                                + "// -------------------------------------------------------- " + "\n"
+                        rewritten = "// -------------------------------------------------------- " + "\n"
                                 + "// " + rndStr + "\n"
                                 + "var " + rndStr + "_pathname = window.location.pathname;" + "\n"
                                 + "var " + rndStr + "_basePath = \"" + resource.path.split("/")[0] + "\";" + "\n"
@@ -333,39 +347,26 @@ public class Warc2Html {
                     }
                 }
 
+
+                // Create a JsonObject
+                JsonObject resourceJSON = new JsonObject();
+                resourceJSON.addProperty("path", resource.path);
+                resourceJSON.addProperty("url", resource.url);
+                resourceJSON.addProperty("type", resource.type);
+                resourceJSON.addProperty("status", resource.status);
+                resourceArray.add(resourceJSON);
+
                 // Show console log
-                System.out.println(resource.url);
-
-                // Add to LOG_FILE
-                String fullLog;
-                String resourceLog = "progress : " + progressPercentage + "\n";
-                resourceLog += "path : " + path.toString() + "\n";
-                resourceLog += "url : " + resource.url + "\n";
-                resourceLog += "type : " + resource.type + "\n";
-                resourceLog += "status : " + resource.status + "\n";
-                resourceLog += "occurrences : " + linksRewritten + "\n";
-                resourceLog += "__NEW__RESOURCE__";
-
-                String fileListPath = outDir.resolve("warcLog.log").toString();
-                Path logFilePath = Paths.get(fileListPath);
-                if (!Files.exists(logFilePath)) {
-                    fullLog = resourceLog;
-                } else {
-                    String fileContent = Files.readString(logFilePath);
-                    fullLog = fileContent + "\n" + resourceLog;
-                }
-                Files.writeString(logFilePath, fullLog, StandardOpenOption.CREATE);
+                System.out.println(resourceJSON);
 
                 idx += 1;
             } catch (Exception ex) {
                 System.out.println("Failed");
-                System.out.println(ex.toString());
-                System.out.println("resource.path : " + resource.path);
-                System.out.println("resource.url : " + resource.url);
-                System.out.println("resource.type : " + resource.type);
-                System.out.println("resource.status : " + resource.status);
+                ex.printStackTrace();
             }
         }
+
+        return resourceArray;
     }
 
     private String rewriteLink(String url, URI baseUri, String basePath) {
