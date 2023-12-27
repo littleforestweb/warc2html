@@ -361,7 +361,7 @@ public class Warc2Html {
 
                 idx += 1;
             } catch (Exception ex) {
-                System.out.println("Failed");
+                System.out.println("Exception");
                 ex.printStackTrace();
             }
         }
