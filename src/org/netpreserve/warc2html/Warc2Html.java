@@ -345,7 +345,6 @@ public class Warc2Html {
                     }
                 }
 
-
                 // Create a JsonObject
                 JsonObject resourceJSON = new JsonObject();
                 resourceJSON.addProperty("path", resource.path);
