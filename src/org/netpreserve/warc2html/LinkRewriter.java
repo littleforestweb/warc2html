@@ -4,10 +4,7 @@
  */
 package org.netpreserve.warc2html;
 
-import net.htmlparser.jericho.CharacterReference;
-import net.htmlparser.jericho.HTMLElementName;
-import net.htmlparser.jericho.OutputDocument;
-import net.htmlparser.jericho.Source;
+import net.htmlparser.jericho.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +13,6 @@ import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import net.htmlparser.jericho.Attribute;
 
 public class LinkRewriter {
 

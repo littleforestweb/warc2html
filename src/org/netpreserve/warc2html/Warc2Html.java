@@ -18,6 +18,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,10 +26,8 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.net.URLDecoder;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 import static java.time.ZoneOffset.UTC;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteCSS;
 import static org.netpreserve.warc2html.LinkRewriter.rewriteJS;
@@ -91,6 +90,38 @@ public class Warc2Html {
         }
 
         System.out.println("-------------------");
+    }
+
+    public static String makeUrlKey(String url) {
+        ParsedUrl parsedUrl = ParsedUrl.parseUrl(url);
+        Canonicalizer.AGGRESSIVE.canonicalize(parsedUrl);
+        return parsedUrl.toString();
+    }
+
+    private static String ensureUniquePath(Map<String, Resource> pathIndex, String path) {
+        if (pathIndex.containsKey(path)) {
+            String[] basenameAndExtension = PathUtils.splitExtension(path);
+            for (long i = 1; pathIndex.containsKey(path); i++) {
+                path = basenameAndExtension[0] + "~" + i + basenameAndExtension[1];
+            }
+        }
+        return path;
+    }
+
+    private static Map<String, String> loadForcedExtensions() {
+        try (var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
+            var map = new HashMap<String, String>();
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                String[] fields = line.strip().split("\\s+");
+                map.put(fields[0], fields[1]);
+            }
+            return Collections.unmodifiableMap(map);
+        } catch (IOException e) {
+            throw new RuntimeException("Error loading forced.extensions", e);
+        }
     }
 
     private void load(String filename, InputStream stream) throws IOException {
@@ -181,38 +212,6 @@ public class Warc2Html {
         this.warcBaseLocation = warcBaseLocation;
     }
 
-    public static String makeUrlKey(String url) {
-        ParsedUrl parsedUrl = ParsedUrl.parseUrl(url);
-        Canonicalizer.AGGRESSIVE.canonicalize(parsedUrl);
-        return parsedUrl.toString();
-    }
-
-    private static String ensureUniquePath(Map<String, Resource> pathIndex, String path) {
-        if (pathIndex.containsKey(path)) {
-            String[] basenameAndExtension = PathUtils.splitExtension(path);
-            for (long i = 1; pathIndex.containsKey(path); i++) {
-                path = basenameAndExtension[0] + "~" + i + basenameAndExtension[1];
-            }
-        }
-        return path;
-    }
-
-    private static Map<String, String> loadForcedExtensions() {
-        try (var reader = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Warc2Html.class.getResourceAsStream("forced.extensions"), "forced.extensions resource missing")))) {
-            var map = new HashMap<String, String>();
-            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                String[] fields = line.strip().split("\\s+");
-                map.put(fields[0], fields[1]);
-            }
-            return Collections.unmodifiableMap(map);
-        } catch (IOException e) {
-            throw new RuntimeException("Error loading forced.extensions", e);
-        }
-    }
-
     private void add(Resource resource) {
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
         path = ensureUniquePath(resourcesByPath, path);
@@ -288,7 +287,6 @@ public class Warc2Html {
                 Path path = outDir.resolve(URLDecoder.decode(resource.path, UTF_8));
                 Files.createDirectories(path.getParent());
 
-                long linksRewritten = 0;
                 try (OutputStream output = Files.newOutputStream(path)) {
                     InputStream input = response.http().body().stream();
                     if (resource.isRedirect()) {
@@ -311,7 +309,7 @@ public class Warc2Html {
                         }
                     } else if (resource.type.equals("text/html")) {
                         URI baseUri = URI.create(resource.url);
-                        linksRewritten = LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
+                        LinkRewriter.rewriteHTML(input, output, url -> rewriteLink(url, baseUri, resource.path));
                     } else {
                         input.transferTo(output);
                     }

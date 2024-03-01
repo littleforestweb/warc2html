@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class LinkRewriterTest {
     @Test
@@ -23,6 +23,7 @@ public class LinkRewriterTest {
                 rewrite("<a href=hello.html class=fancy>link</a>" +
                         "<img src=//images.example.org/cat.jpg>", String::toUpperCase));
     }
+
     @Test
     public void testRewriteCSS() {
         assertEquals("body { background: url(TEST.JPG); } ", LinkRewriter.rewriteCSS("body { background: url('test.jpg' ); } ", String::toUpperCase));

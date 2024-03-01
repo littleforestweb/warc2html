@@ -5,16 +5,6 @@
 
 package org.netpreserve.warc2html;
 
-import org.junit.Test;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.function.Function;
-
-import static org.junit.Assert.*;
-
 public class HtmlRewriterTest {
 
 }

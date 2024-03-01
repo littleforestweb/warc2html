@@ -7,7 +7,7 @@ package org.netpreserve.warc2html;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class Warc2HtmlTest {
     @Test

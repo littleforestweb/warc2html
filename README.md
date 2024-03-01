@@ -2,9 +2,10 @@ warc2html <img src="warc2html.png" align="right">
 =========
 
 Converts WARC files to static html while rewriting links to relative paths suitable for browsing offline or rehosting
-on a standard web server. 
+on a standard web server.
 
 Limitations:
+
 * Links in JavaScript are not rewritten
 * Assumes there's only one snapshot of each URL in the input
 * Does not handle resource records (yet)
@@ -35,7 +36,7 @@ Files are renamed to remove characters like "?" that are disallowed on some syst
 based on the Content-Type header according to [these rules](resources/org/netpreserve/warc2html/forced.extensions).
 
 URLs ending in / will be saved as index.html. Where two WARC records would produce the same filename they are
-disambiguated by adding a number like ~1, ~2, ~3 to the end of the filename. 
+disambiguated by adding a number like ~1, ~2, ~3 to the end of the filename.
 
 License
 -------
