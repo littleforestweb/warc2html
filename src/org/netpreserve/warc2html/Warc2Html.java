@@ -40,6 +40,7 @@ public class Warc2Html {
     private final Map<String, Resource> resourcesByPath = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     private final Map<String, String> forcedExtensions = new HashMap<>(DEFAULT_FORCED_EXTENSIONS);
     private String warcBaseLocation = "";
+    private String rejectedPathsFilePath = "";
 
     public static void main(String[] args) throws IOException {
         System.out.println("Initializing");
@@ -48,30 +49,41 @@ public class Warc2Html {
         Path outputDir = Paths.get(".");
 
         for (int i = 0; i < args.length; i++) {
-            if (args[i].startsWith("-")) {
-                switch (args[i]) {
-                    case "-h":
-                    case "--help":
-                        System.out.println("Usage: warc2html [-o outdir] file1.warc [file2.warc ...]");
-                        System.out.println("       warc2html [-o outdir] -b http://example.org/warcs/ file1.cdx [file2.cdx ...]");
-                        return;
-                    case "-b":
-                    case "--warc-base":
-                        warc2Html.setWarcBaseLocation(args[++i]);
-                        break;
-                    case "-o":
-                    case "--output-dir":
-                        outputDir = Paths.get(args[++i]);
-                        break;
-                    default:
-                        System.err.println("warc2html: unknown option: " + args[i]);
-                        System.exit(1);
-                        return;
-                }
-            } else {
-                try (InputStream stream = new FileInputStream(args[i])) {
-                    warc2Html.load(args[i], stream);
-                }
+            switch (args[i]) {
+                case "-h":
+                case "--help":
+                    System.out.println("Usage: warc2html [-o outdir] file1.warc [file2.warc ...]");
+                    System.out.println("       warc2html [-o outdir] -b http://example.org/warcs/ file1.cdx [file2.cdx ...]");
+                    return;
+                case "-b":
+                case "--warc-base":
+                    warc2Html.setWarcBaseLocation(args[++i]);
+                    break;
+                case "-o":
+                case "--output-dir":
+                    outputDir = Paths.get(args[++i]);
+                    break;
+                case "-rp":
+                case "--rejected-paths":
+                    warc2Html.setRejectedPathsFilePath(args[++i]);
+                    break;
+                case "-wf":
+                case "--warc-folder":
+                    File[] files = new File((args[++i])).listFiles();
+                    assert files != null;
+                    Arrays.sort(files);
+                    for (int j = 0; j < files.length; j++) {
+                        File file = files[j];
+                        System.out.println("Load (" + (j + 1) + "/" + files.length + ") - " + file.getName());
+                        try (InputStream stream = new FileInputStream(file.getAbsolutePath())) {
+                            warc2Html.load(file.getAbsolutePath(), stream);
+                        }
+                    }
+                    break;
+                default:
+                    System.err.println("warc2html: unknown option: " + args[i]);
+                    System.exit(1);
+                    return;
             }
         }
 
@@ -90,6 +102,54 @@ public class Warc2Html {
         }
 
         System.out.println("-------------------");
+    }
+
+    public static JsonObject loadRejectedPathsFromFile(String filePath) {
+        // Initialize Gson
+        Gson gson = new Gson();
+        JsonObject jsonObject = new JsonObject();
+
+        try {
+            // Read the file
+            String jsonString = Files.readString(Paths.get(filePath));
+
+            // Parse the JSON string into a JSON object
+            jsonObject = gson.fromJson(jsonString, JsonObject.class);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return jsonObject;
+    }
+
+    public static boolean isRejectedPath(String inputString, JsonObject rulesObject) {
+
+        // Get startsWith and contains values
+        JsonArray startsWithArray = rulesObject.getAsJsonArray("startswith");
+        JsonArray containsArray = rulesObject.getAsJsonArray("contains");
+
+        // Check if string starts with
+        if (startsWithArray != null) {
+            for (int i = 0; i < startsWithArray.size(); i++) {
+                String startsWithValue = startsWithArray.get(i).getAsString();
+                if (inputString.startsWith(startsWithValue)) {
+                    return true;
+                }
+            }
+        }
+
+        // Check if string contains
+        if (containsArray != null) {
+            for (int i = 0; i < containsArray.size(); i++) {
+                String containsValue = containsArray.get(i).getAsString();
+                if (inputString.contains(containsValue)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public static String makeUrlKey(String url) {
@@ -124,8 +184,15 @@ public class Warc2Html {
         }
     }
 
+    public void setWarcBaseLocation(String warcBaseLocation) {
+        this.warcBaseLocation = warcBaseLocation;
+    }
+
+    public void setRejectedPathsFilePath(String rejectedPathsFilePath) {
+        this.rejectedPathsFilePath = rejectedPathsFilePath;
+    }
+
     private void load(String filename, InputStream stream) throws IOException {
-        System.out.println("Load - " + filename);
         if (!stream.markSupported()) {
             stream = new BufferedInputStream(stream);
         }
@@ -208,10 +275,6 @@ public class Warc2Html {
         }
     }
 
-    public void setWarcBaseLocation(String warcBaseLocation) {
-        this.warcBaseLocation = warcBaseLocation;
-    }
-
     private void add(Resource resource) {
         String path = PathUtils.pathFromUrl(resource.url, forcedExtensions.get(resource.type));
         path = ensureUniquePath(resourcesByPath, path);
@@ -263,15 +326,29 @@ public class Warc2Html {
     }
 
     public JsonArray writeTo(Path outDir) throws IOException {
+
+        // Load Rejected Paths JSON
+        JsonObject rejectedPaths = loadRejectedPathsFromFile(rejectedPathsFilePath);
+        System.out.println(rejectedPaths);
+
         // Create an array of JsonObjects
         JsonArray resourceArray = new JsonArray();
 
+        // Create outDir directory
         Files.createDirectories(outDir);
 
+        // Set counters
         int idx = 0;
         int resourcesSize = resourcesByPath.values().size() - 1;
 
+        // Iterate over every resource
         for (Resource resource : resourcesByPath.values()) {
+
+            // Check if resource is to be rejected -> continue
+            if (isRejectedPath(resource.url, rejectedPaths)) {
+                continue;
+            }
+
             try (WarcReader reader = openWarc(resource.warc, resource.offset, resource.length)) {
 
                 String progressPercentage = Float.toString((idx * 100.0f) / resourcesSize);

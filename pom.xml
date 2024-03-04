@@ -16,6 +16,7 @@
     </properties>
 
     <build>
+        <finalName>warc2html</finalName>
         <sourceDirectory>${basedir}/src</sourceDirectory>
         <testSourceDirectory>${basedir}/test</testSourceDirectory>
         <resources>
