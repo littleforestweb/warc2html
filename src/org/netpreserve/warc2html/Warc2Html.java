@@ -69,8 +69,13 @@ public class Warc2Html {
                     break;
                 case "-wf":
                 case "--warc-folder":
-                    File[] files = new File((args[++i])).listFiles();
-                    assert files != null;
+                    File[] files = new File(args[++i]).listFiles((dir, name) -> name.toLowerCase().endsWith(".warc.gz"));
+
+                    // Ensure files exist
+                    if (files == null || files.length == 0) {
+                        System.out.println("No .warc.gz files found in the specified directory.");
+                        return;
+                    }
                     Arrays.sort(files);
                     for (int j = 0; j < files.length; j++) {
                         File file = files[j];
